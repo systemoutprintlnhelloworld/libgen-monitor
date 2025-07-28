@@ -15,7 +15,8 @@ const defaultMirrors = [
   'http://libgen.gs',
   'https://libgen.la/',
   'https://libgen.bz/',
-  'https://libgen.vg/'
+  'https://libgen.vg/',
+  'https://libgen.gl/',
 ];
 
 const trustedDomains = ['libgen.st', 'libgen.rs', 'libgen.is'];
