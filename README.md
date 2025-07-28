@@ -87,10 +87,13 @@ https://your-project-name.vercel.app/api/speedtest
 ## 🔧 Tampermonkey 脚本配置
 
 ### 1. 安装脚本
-
 1. 安装 [Tampermonkey](https://www.tampermonkey.net/) 扩展
-2. 复制第三个 artifact 的脚本代码
-3. 修改脚本中的 API 地址：
+#### 方案1：greasyfork一键安装（免配置）
+2. <a class="install-link" data-install-format="js" data-ping-url="/scripts/543868/install-ping?authenticity_token=jn--jY_-eKT8BJYzCuAH9xAoeHPx6C-bjcujU9sB7Qs&amp;mo=bb4a67affab85e0d11a15358901e3aae3e395f62" data-ip-address="54.250.2.240" data-script-id="543868" data-ping-key="ac610e4f113dfebe1a5e" data-is-previous-version="false" data-previous-version-warning="这不是此脚本的最新版本。如果您选择安装，您将永远不会收到新版本的更新。仍要安装吗？" rel="nofollow" data-script-name="Libgen 镜像助手" data-script-namespace="https://annas-archive.org/" data-script-version="4.0.2" data-update-label="更新到 4.0.2 版本" data-downgrade-label="降级到 4.0.2 版本" data-reinstall-label="重新安装 4.0.2 版本" href="https://update.greasyfork.org/scripts/543868/Libgen%20%E9%95%9C%E5%83%8F%E5%8A%A9%E6%89%8B.user.js">安装此脚本</a>
+点击下载即可
+#### 方案2：自行安装
+3. 复制第三个 artifact 的脚本代码
+4. 修改脚本中的 API 地址：
 
 ```javascript
 // 将这行：
