@@ -3,7 +3,7 @@
 // @namespace    https://annas-archive.org/
 // @version      4.0.1
 // @description  通过API获取最佳Libgen镜像，优化下载体验，支持悬浮窗管理
-// @author       You
+// @author       claude and gpt，but not me
 // @match        https://zh.annas-archive.org/*
 // @match        https://*/*
 // @match        http://*/*
@@ -317,29 +317,40 @@
         
         // 拖拽功能
         let isDragging = false;
+        let dragStarted = false;
         let startX, startY, startLeft, startTop;
         
         floatBtn.addEventListener('mousedown', (e) => {
-            isDragging = true;
+            dragStarted = false; // 重置拖拽开始标志
             startX = e.clientX;
             startY = e.clientY;
             const rect = floatBtn.getBoundingClientRect();
             startLeft = rect.left;
             startTop = rect.top;
-            floatBtn.classList.add('dragging');
-            floatBtn.style.left = startLeft + 'px';
-            floatBtn.style.right = 'auto';
-            document.body.style.userSelect = 'none';
         });
         
         document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            
-            const deltaX = e.clientX - startX;
-            const deltaY = e.clientY - startY;
-            
-            floatBtn.style.left = (startLeft + deltaX) + 'px';
-            floatBtn.style.top = (startTop + deltaY) + 'px';
+            if (e.buttons === 1) { // 只有在按下鼠标时才处理
+                const deltaX = Math.abs(e.clientX - startX);
+                const deltaY = Math.abs(e.clientY - startY);
+                
+                // 只有移动超过5像素才算开始拖拽
+                if ((deltaX > 5 || deltaY > 5) && !dragStarted) {
+                    dragStarted = true;
+                    isDragging = true;
+                    floatBtn.classList.add('dragging');
+                    floatBtn.style.left = startLeft + 'px';
+                    floatBtn.style.right = 'auto';
+                    document.body.style.userSelect = 'none';
+                }
+                
+                if (isDragging) {
+                    const deltaX = e.clientX - startX;
+                    const deltaY = e.clientY - startY;
+                    floatBtn.style.left = (startLeft + deltaX) + 'px';
+                    floatBtn.style.top = (startTop + deltaY) + 'px';
+                }
+            }
         });
         
         document.addEventListener('mouseup', () => {
@@ -364,6 +375,7 @@
                     floatBtn.style.borderRadius = '0 25px 25px 0';
                 }
             }
+            dragStarted = false; // 重置拖拽开始标志
         });
         
         // 悬停显示信息
@@ -380,7 +392,11 @@
         });
         
         floatBtn.addEventListener('click', (e) => {
-            if (!isDragging) {
+            console.log('[Libgen] 悬浮按钮被点击, isDragging:', isDragging, 'dragStarted:', dragStarted);
+            
+            // 只有在没有拖拽的情况下才处理点击
+            if (!isDragging && !dragStarted) {
+                console.log('[Libgen] 开始切换面板显示状态');
                 togglePanel();
             }
             e.stopPropagation();
@@ -427,8 +443,11 @@
     
     // 创建控制面板
     function createPanel() {
+        console.log('[Libgen] 开始创建控制面板');
+        
         panel = document.createElement('div');
         panel.className = 'libgen-panel';
+        panel.style.display = 'none'; // 初始隐藏
         panel.innerHTML = `
             <h3>📚 Libgen 镜像管理</h3>
             <div style="margin-bottom: 10px; font-size: 12px; color: #666;">
@@ -439,6 +458,7 @@
             <div class="libgen-controls">
                 <button class="libgen-btn libgen-btn-primary" onclick="window.libgenRefresh()">🔄 手动测速</button>
                 <button class="libgen-btn libgen-btn-success" onclick="window.libgenOpenMonitor()">📊 监控面板</button>
+                <button class="libgen-btn libgen-btn-primary" onclick="window.libgenTestAPI()">🔧 测试API</button>
                 <button class="libgen-btn libgen-btn-primary" onclick="window.libgenAddMirror()">➕ 添加镜像</button>
                 <button class="libgen-btn libgen-btn-primary" onclick="window.libgenExport()">📤 导出数据</button>
             </div>
@@ -448,38 +468,75 @@
         `;
         
         document.body.appendChild(panel);
-        loadPanelData();
+        console.log('[Libgen] 面板已添加到DOM');
         
         // 点击外部关闭面板
         document.addEventListener('click', (e) => {
-            if (!panel.contains(e.target) && !floatBtn.contains(e.target)) {
+            if (panel && !panel.contains(e.target) && !floatBtn.contains(e.target)) {
                 panel.style.display = 'none';
+                console.log('[Libgen] 点击外部，隐藏面板');
             }
         });
         
         // 全局函数
-        window.libgenRefresh = () => refreshPanelData(true);
-        window.libgenOpenMonitor = () => window.open(API_BASE.replace('/api/speedtest', ''), '_blank');
+        window.libgenRefresh = () => {
+            console.log('[Libgen] 手动刷新被调用');
+            refreshPanelData(true);
+        };
+        window.libgenOpenMonitor = () => {
+            const monitorUrl = API_BASE.replace('/api/speedtest', '');
+            console.log('[Libgen] 打开监控面板:', monitorUrl);
+            window.open(monitorUrl, '_blank');
+        };
+        window.libgenTestAPI = testAPIConnection;
         window.libgenAddMirror = addNewMirror;
         window.libgenExport = exportData;
+        
+        console.log('[Libgen] 控制面板创建完成');
     }
     
     function togglePanel() {
-        if (!panel) createPanel();
-        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        if (panel.style.display === 'block') {
+        console.log('[Libgen] togglePanel 被调用');
+        
+        if (!panel) {
+            console.log('[Libgen] 创建新面板');
+            createPanel();
+        }
+        
+        // 获取当前显示状态
+        const currentDisplay = window.getComputedStyle(panel).display;
+        const isVisible = currentDisplay !== 'none';
+        
+        console.log('[Libgen] 当前面板状态:', currentDisplay, '可见:', isVisible);
+        
+        if (isVisible) {
+            panel.style.display = 'none';
+            console.log('[Libgen] 隐藏面板');
+        } else {
+            panel.style.display = 'block';
+            console.log('[Libgen] 显示面板');
             loadPanelData();
         }
     }
     
     async function loadPanelData() {
+        console.log('[Libgen] 开始加载面板数据');
+        
         const listElement = document.getElementById('libgen-mirror-list');
+        if (!listElement) {
+            console.error('[Libgen] 找不到镜像列表元素');
+            return;
+        }
+        
         listElement.innerHTML = '<div class="libgen-loading">正在加载镜像信息...</div>';
         
         try {
+            console.log('[Libgen] 调用 fetchMirrorData');
             const data = await fetchMirrorData();
+            console.log('[Libgen] 获取到数据:', data);
             renderMirrorList(data);
         } catch (error) {
+            console.error('[Libgen] 加载面板数据失败:', error);
             listElement.innerHTML = `<div class="libgen-loading">❌ 加载失败: ${error.message}</div>`;
         }
     }
@@ -509,14 +566,31 @@
     }
     
     function renderMirrorList(data) {
+        console.log('[Libgen] 开始渲染镜像列表:', data);
+        
         const listElement = document.getElementById('libgen-mirror-list');
+        if (!listElement) {
+            console.error('[Libgen] 找不到镜像列表元素');
+            return;
+        }
         
         // 更新数据来源和缓存状态
-        const cacheAge = Date.now() - lastFetchTime;
-        const cacheMinutes = Math.floor(cacheAge / 60000);
-        document.getElementById('data-source').textContent = 'Vercel API';
-        document.getElementById('cache-status').textContent = 
-            cacheMinutes < 1 ? '刚刚更新' : `${cacheMinutes}分钟前`;
+        const dataSourceElement = document.getElementById('data-source');
+        const cacheStatusElement = document.getElementById('cache-status');
+        
+        if (dataSourceElement && cacheStatusElement) {
+            const cacheAge = Date.now() - lastFetchTime;
+            const cacheMinutes = Math.floor(cacheAge / 60000);
+            dataSourceElement.textContent = 'Vercel API';
+            cacheStatusElement.textContent = 
+                cacheMinutes < 1 ? '刚刚更新' : `${cacheMinutes}分钟前`;
+        }
+        
+        if (!data || !data.results || !Array.isArray(data.results)) {
+            console.error('[Libgen] 数据格式错误:', data);
+            listElement.innerHTML = '<div class="libgen-loading">❌ 数据格式错误</div>';
+            return;
+        }
         
         const html = data.results.map((mirror, index) => {
             const domain = new URL(mirror.url).hostname;
@@ -553,6 +627,7 @@
         }).join('');
         
         listElement.innerHTML = html || '<div class="libgen-loading">暂无镜像数据</div>';
+        console.log('[Libgen] 镜像列表渲染完成');
         
         // 添加删除镜像的全局函数
         window.libgenRemoveMirror = (url) => {
@@ -603,6 +678,72 @@
         if (tooltip) {
             tooltip.remove();
             tooltip = null;
+        }
+    }
+    
+    // 测试API连接
+    async function testAPIConnection() {
+        console.log('[Libgen] 开始测试API连接...');
+        
+        const listElement = document.getElementById('libgen-mirror-list');
+        if (listElement) {
+            listElement.innerHTML = '<div class="libgen-loading">🔧 正在测试API连接...</div>';
+        }
+        
+        try {
+            const testStart = Date.now();
+            
+            // 强制清空缓存进行真实测试
+            cachedData = null;
+            lastFetchTime = 0;
+            
+            const data = await fetchMirrorData(true);
+            const testTime = Date.now() - testStart;
+            
+            console.log('[Libgen] API测试成功，耗时:', testTime + 'ms');
+            
+            if (listElement) {
+                listElement.innerHTML = `
+                    <div style="padding: 15px; background: #d4edda; color: #155724; border-radius: 8px; margin: 10px 0;">
+                        <strong>✅ API连接测试成功！</strong><br>
+                        <small>
+                        响应时间: ${testTime}ms<br>
+                        API地址: ${API_BASE}<br>
+                        返回数据: ${data.results?.length || 0} 个镜像<br>
+                        在线镜像: ${data.onlineMirrors}/${data.totalMirrors}
+                        </small>
+                    </div>
+                `;
+            }
+            
+            // 延迟2秒后显示正常数据
+            setTimeout(() => {
+                renderMirrorList(data);
+            }, 2000);
+            
+            showNotification('✅ API连接测试成功！');
+            
+        } catch (error) {
+            console.error('[Libgen] API测试失败:', error);
+            
+            if (listElement) {
+                listElement.innerHTML = `
+                    <div style="padding: 15px; background: #f8d7da; color: #721c24; border-radius: 8px; margin: 10px 0;">
+                        <strong>❌ API连接测试失败</strong><br>
+                        <small>
+                        错误信息: ${error.message}<br>
+                        API地址: ${API_BASE}<br><br>
+                        可能的原因：<br>
+                        1. API地址配置错误<br>
+                        2. Vercel服务未部署<br>
+                        3. 网络连接问题<br>
+                        4. CORS跨域限制
+                        </small>
+                    </div>
+                `;
+            }
+            
+            showNotification('❌ API连接测试失败，请检查配置');
         }
     }
     
@@ -767,12 +908,19 @@
     // 初始化
     function init() {
         console.log('[Libgen] 初始化插件...');
+        console.log('[Libgen] API地址:', API_BASE);
+        
+        // 检查API配置
+        if (API_BASE.includes('your-vercel-app.vercel.app')) {
+            console.warn('[Libgen] ⚠️ 请先配置正确的API地址！当前为示例地址。');
+        }
         
         // 创建悬浮按钮（所有页面）
         createFloatingButton();
         
         // 页面特定增强（仅 md5 页面）
         if (isAnnasMd5Page) {
+            console.log('[Libgen] 检测到 md5 页面，将进行页面增强');
             // 等待页面加载完成
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', enhanceAnnasMd5Page);
@@ -782,6 +930,10 @@
         }
         
         console.log('[Libgen] ✅ 插件初始化完成');
+        console.log('[Libgen] 💡 使用提示:');
+        console.log('[Libgen] - 悬停按钮1.5秒查看镜像状态');
+        console.log('[Libgen] - 点击按钮打开控制面板');
+        console.log('[Libgen] - 在md5页面查看优化下载链接');
     }
     
     // 启动
