@@ -103,7 +103,7 @@ async function performSpeedTest() {
 
 
 
-export default async function handler(req) {
+
 export default async function handler(req) {
   const now = Date.now();
   
