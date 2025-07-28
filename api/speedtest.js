@@ -101,12 +101,7 @@ async function performSpeedTest() {
   return speedTestCache;
 }
 
-// 使用 Edge Runtime 获得更长的执行时间（30秒）
-export const config = {
-  runtime: 'edge',
-};
 
-export default async function handler(req) {
 export default async function handler(req) {
   const now = Date.now();
   
