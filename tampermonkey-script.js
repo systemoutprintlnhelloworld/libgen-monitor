@@ -3,7 +3,7 @@
 // @namespace    https://annas-archive.org/
 // @version      4.0
 // @description  通过API获取最佳Libgen镜像，优化下载体验，支持悬浮窗管理
-// @author       claude and gpt , but not nicai
+// @author       You
 // @match        https://zh.annas-archive.org/*
 // @match        https://*/*
 // @match        http://*/*
@@ -538,7 +538,7 @@
         console.log('[Libgen] 开始增强 Annas Archive 页面...');
         
         // 获取 MD5
-        const md5Match = location.pathname.match(/\\/md5\\/([a-f0-9]{32})/);
+        const md5Match = location.pathname.match(/\/md5\/([a-f0-9]{32})/);
         if (!md5Match) {
             console.log('[Libgen] 未找到 MD5，跳过页面增强');
             return;
