@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Libgen 镜像助手 v4 - API版
+// @name         Libgen 镜像助手 v4 - API版（修复版）
 // @namespace    https://annas-archive.org/
-// @version      4.0
+// @version      4.0.1
 // @description  通过API获取最佳Libgen镜像，优化下载体验，支持悬浮窗管理
 // @author       You
 // @match        https://zh.annas-archive.org/*
@@ -19,10 +19,12 @@
 (function() {
     'use strict';
     
-    // 配置
-    const API_BASE = 'https://your-vercel-app.vercel.app/api/speedtest'; // 替换为你的 Vercel API
+    // 配置 - 请替换为你的 Vercel API 地址
+    const API_BASE = 'https://your-vercel-app.vercel.app/api/speedtest';
     const CACHE_DURATION = 10 * 60 * 1000; // 10分钟本地缓存
     const isAnnasMd5Page = location.href.includes('zh.annas-archive.org/md5/');
+    
+    console.log('[Libgen] 脚本开始加载...');
     
     // 样式注入
     GM_addStyle(`
@@ -248,6 +250,12 @@
     let hoverTimer = null;
     let tooltip = null;
     
+    // 获取 MD5 值
+    function getMd5FromUrl() {
+        const match = location.pathname.match(/\/md5\/([a-f0-9]{32})/);
+        return match ? match[1] : null;
+    }
+    
     // API 调用函数
     async function fetchMirrorData(force = false) {
         console.log('[Libgen API] 开始获取镜像数据...');
@@ -259,7 +267,6 @@
         }
         
         try {
-            // 使用 GM_xmlhttpRequest 避免 CORS 问题
             return new Promise((resolve, reject) => {
                 GM_xmlhttpRequest({
                     method: 'GET',
@@ -293,21 +300,6 @@
             });
         } catch (error) {
             console.error('[Libgen API] ❌ 获取镜像数据失败:', error);
-            
-            // 如果API失败，尝试使用本地缓存
-            const localCache = GM_getValue('libgen_local_cache');
-            if (localCache) {
-                try {
-                    const parsed = JSON.parse(localCache);
-                    if (Date.now() - parsed.timestamp < 30 * 60 * 1000) { // 30分钟内的缓存
-                        console.log('[Libgen API] 使用本地缓存数据');
-                        return parsed.data;
-                    }
-                } catch (e) {
-                    console.error('[Libgen API] 本地缓存解析失败:', e);
-                }
-            }
-            
             throw error;
         }
     }
@@ -449,13 +441,13 @@
     
     async function loadPanelData() {
         const listElement = document.getElementById('libgen-mirror-list');
-        listElement.innerHTML = '<div class=\"libgen-loading\">正在加载镜像信息...</div>';
+        listElement.innerHTML = '<div class="libgen-loading">正在加载镜像信息...</div>';
         
         try {
             const data = await fetchMirrorData();
             renderMirrorList(data);
         } catch (error) {
-            listElement.innerHTML = `<div class=\"libgen-loading\">❌ 加载失败: ${error.message}</div>`;
+            listElement.innerHTML = `<div class="libgen-loading">❌ 加载失败: ${error.message}</div>`;
         }
     }
     
@@ -465,7 +457,7 @@
             renderMirrorList(data);
         } catch (error) {
             document.getElementById('libgen-mirror-list').innerHTML = 
-                `<div class=\"libgen-loading\">❌ 刷新失败: ${error.message}</div>`;
+                `<div class="libgen-loading">❌ 刷新失败: ${error.message}</div>`;
         }
     }
     
@@ -494,7 +486,7 @@
             `;
         }).join('');
         
-        listElement.innerHTML = html || '<div class=\"libgen-loading\">暂无镜像数据</div>';
+        listElement.innerHTML = html || '<div class="libgen-loading">暂无镜像数据</div>';
     }
     
     // 工具提示
@@ -538,13 +530,12 @@
         console.log('[Libgen] 开始增强 Annas Archive 页面...');
         
         // 获取 MD5
-        const md5Match = location.pathname.match(/\/md5\/([a-f0-9]{32})/);
-        if (!md5Match) {
+        const md5 = getMd5FromUrl();
+        if (!md5) {
             console.log('[Libgen] 未找到 MD5，跳过页面增强');
             return;
         }
         
-        const md5 = md5Match[1];
         console.log('[Libgen] 检测到 MD5:', md5);
         
         try {
@@ -565,36 +556,43 @@
     function injectDownloadBlock(mirror, md5) {
         // 寻找合适的插入位置
         const selectors = [
-            'h3:contains(\"快速下载\")',
-            '[data-component=\"FastDownloadSection\"]',
-            '.text-xl.font-bold:contains(\"下载\")',
-            'h2:contains(\"下载\")',
-            '.downloads'
+            'h3',
+            'h2', 
+            '.text-xl',
+            '.downloads',
+            'main',
+            '.container',
+            '.content',
+            '#content'
         ];
         
         let insertPoint = null;
-        for (const selector of selectors) {
-            if (selector.includes('contains')) {
-                const elements = Array.from(document.querySelectorAll('h3, h2, .text-xl')).filter(el => 
-                    el.textContent.includes('下载') || el.textContent.includes('Download')
-                );
-                if (elements.length > 0) {
-                    insertPoint = elements[0];
-                    break;
-                }
-            } else {
+        
+        // 优先找包含"下载"或"Download"的标题
+        const headings = Array.from(document.querySelectorAll('h1, h2, h3, .text-xl, .font-bold')).filter(el => 
+            el.textContent.includes('下载') || 
+            el.textContent.includes('Download') || 
+            el.textContent.includes('快速') ||
+            el.textContent.includes('Fast')
+        );
+        
+        if (headings.length > 0) {
+            insertPoint = headings[0];
+        } else {
+            // 如果没找到特定标题，使用通用选择器
+            for (const selector of selectors) {
                 insertPoint = document.querySelector(selector);
                 if (insertPoint) break;
             }
         }
         
-        // 如果没找到特定位置，插入到主要内容区域
+        // 最后的备选方案
         if (!insertPoint) {
-            insertPoint = document.querySelector('main, .container, .content, #content') || document.body;
+            insertPoint = document.body;
         }
         
         const domain = new URL(mirror.url).hostname;
-        const downloadUrl = `${mirror.url.replace(/\\/$/, '')}/book/index.php?md5=${md5}`;
+        const downloadUrl = `${mirror.url.replace(/\/$/, '')}/book/index.php?md5=${md5}`;
         
         const downloadBlock = document.createElement('div');
         downloadBlock.className = 'libgen-download-block';
@@ -611,7 +609,7 @@
         `;
         
         // 插入下载块
-        if (insertPoint.tagName === 'H3' || insertPoint.tagName === 'H2') {
+        if (insertPoint.tagName === 'H1' || insertPoint.tagName === 'H2' || insertPoint.tagName === 'H3') {
             insertPoint.parentNode.insertBefore(downloadBlock, insertPoint.nextSibling);
         } else {
             insertPoint.insertBefore(downloadBlock, insertPoint.firstChild);
@@ -667,7 +665,7 @@
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', enhanceAnnasMd5Page);
             } else {
-                enhanceAnnasMd5Page();
+                setTimeout(enhanceAnnasMd5Page, 1000); // 延迟1秒确保页面完全加载
             }
         }
         
