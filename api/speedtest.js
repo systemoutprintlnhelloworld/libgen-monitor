@@ -1,4 +1,9 @@
-// api/speedtest.js - Vercel API 端点
+// api/speedtest.js - Vercel Edge Function
+
+// 配置 Edge Runtime
+export const config = {
+  runtime: 'edge',
+};
 
 const defaultMirrors = [
   'http://libgen.rs/',
