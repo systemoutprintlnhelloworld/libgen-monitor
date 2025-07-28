@@ -3,7 +3,7 @@
 // @namespace    https://annas-archive.org/
 // @version      4.0
 // @description  通过API获取最佳Libgen镜像，优化下载体验，支持悬浮窗管理
-// @author       You
+// @author       claude and gpt , but not nicai
 // @match        https://zh.annas-archive.org/*
 // @match        https://*/*
 // @match        http://*/*
