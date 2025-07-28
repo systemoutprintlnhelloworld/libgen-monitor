@@ -188,6 +188,7 @@
             background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent) !important;
             transform: rotate(45deg) !important;
             animation: shimmer 3s infinite !important;
+            pointer-events: none !important;
         }
         
         @keyframes shimmer {
@@ -215,6 +216,9 @@
             margin-top: 5px !important;
             transition: all 0.3s ease !important;
             border: 1px solid rgba(255,255,255,0.3) !important;
+            position: relative !important;
+            z-index: 10 !important;
+            cursor: pointer !important;
         }
         
         .libgen-download-link:hover {
@@ -364,7 +368,7 @@
         
         // 悬停显示信息
         floatBtn.addEventListener('mouseenter', () => {
-            hoverTimer = setTimeout(showTooltipInfo, 5000); // 5秒后显示
+            hoverTimer = setTimeout(showTooltipInfo, 1500); // 1.5秒后显示
         });
         
         floatBtn.addEventListener('mouseleave', () => {
@@ -393,11 +397,31 @@
             const bestMirror = onlineMirrors[0];
             
             if (bestMirror) {
-                const domain = new URL(bestMirror.url).hostname;
-                showTooltip(`🚀 最佳镜像: ${domain}\\n⚡ 延迟: ${bestMirror.delay}ms\\n🟢 在线: ${data.onlineMirrors}/${data.totalMirrors}`, floatBtn);
+                // 构建详细的测速信息
+                const tooltipLines = [
+                    `🚀 最佳镜像: ${new URL(bestMirror.url).hostname}`,
+                    `⚡ 延迟: ${bestMirror.delay}ms`,
+                    `🟢 在线: ${data.onlineMirrors}/${data.totalMirrors}`,
+                    ``,
+                    `📊 所有镜像状态:`
+                ];
+                
+                // 添加前5个镜像的状态
+                data.results.slice(0, 5).forEach(mirror => {
+                    const domain = new URL(mirror.url).hostname;
+                    const status = mirror.status === 'online' ? `🟢 ${mirror.delay}ms` : '🔴 离线';
+                    const trusted = mirror.trusted ? ' 🔒' : '';
+                    tooltipLines.push(`${domain}${trusted}: ${status}`);
+                });
+                
+                if (data.results.length > 5) {
+                    tooltipLines.push(`... 还有 ${data.results.length - 5} 个镜像`);
+                }
+                
+                showTooltip(tooltipLines.join('\\n'), floatBtn);
             }
         } catch (error) {
-            showTooltip('❌ 无法获取镜像信息', floatBtn);
+            showTooltip('❌ 无法获取镜像信息\\n点击打开控制面板查看详情', floatBtn);
         }
     }
     
@@ -407,11 +431,19 @@
         panel.className = 'libgen-panel';
         panel.innerHTML = `
             <h3>📚 Libgen 镜像管理</h3>
+            <div style="margin-bottom: 10px; font-size: 12px; color: #666;">
+                数据来源: <span id="data-source">Vercel API</span> | 
+                缓存状态: <span id="cache-status">加载中...</span>
+            </div>
             <div id="libgen-mirror-list" class="libgen-loading">正在加载镜像信息...</div>
             <div class="libgen-controls">
-                <button class="libgen-btn libgen-btn-primary" onclick="window.libgenRefresh()">🔄 刷新</button>
+                <button class="libgen-btn libgen-btn-primary" onclick="window.libgenRefresh()">🔄 手动测速</button>
                 <button class="libgen-btn libgen-btn-success" onclick="window.libgenOpenMonitor()">📊 监控面板</button>
-                <button class="libgen-btn libgen-btn-primary" onclick="window.libgenExport()">📤 导出</button>
+                <button class="libgen-btn libgen-btn-primary" onclick="window.libgenAddMirror()">➕ 添加镜像</button>
+                <button class="libgen-btn libgen-btn-primary" onclick="window.libgenExport()">📤 导出数据</button>
+            </div>
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; font-size: 11px; color: #999;">
+                💡 提示: 悬停按钮1.5秒显示快速状态 | 点击打开管理面板
             </div>
         `;
         
@@ -428,6 +460,7 @@
         // 全局函数
         window.libgenRefresh = () => refreshPanelData(true);
         window.libgenOpenMonitor = () => window.open(API_BASE.replace('/api/speedtest', ''), '_blank');
+        window.libgenAddMirror = addNewMirror;
         window.libgenExport = exportData;
     }
     
@@ -452,18 +485,40 @@
     }
     
     async function refreshPanelData(force = false) {
+        const listElement = document.getElementById('libgen-mirror-list');
+        
+        if (force) {
+            listElement.innerHTML = '<div class="libgen-loading">🔄 正在手动测速所有镜像...</div>';
+            document.getElementById('data-source').textContent = '手动测速中';
+            document.getElementById('cache-status').textContent = '测速中...';
+        }
+        
         try {
             const data = await fetchMirrorData(force);
             renderMirrorList(data);
+            
+            if (force) {
+                // 显示测速完成提示
+                showNotification('✅ 手动测速完成！');
+            }
         } catch (error) {
-            document.getElementById('libgen-mirror-list').innerHTML = 
-                `<div class="libgen-loading">❌ 刷新失败: ${error.message}</div>`;
+            listElement.innerHTML = `<div class="libgen-loading">❌ ${force ? '手动测速' : '刷新'}失败: ${error.message}</div>`;
+            document.getElementById('data-source').textContent = '错误';
+            document.getElementById('cache-status').textContent = '失败';
         }
     }
     
     function renderMirrorList(data) {
         const listElement = document.getElementById('libgen-mirror-list');
-        const html = data.results.map(mirror => {
+        
+        // 更新数据来源和缓存状态
+        const cacheAge = Date.now() - lastFetchTime;
+        const cacheMinutes = Math.floor(cacheAge / 60000);
+        document.getElementById('data-source').textContent = 'Vercel API';
+        document.getElementById('cache-status').textContent = 
+            cacheMinutes < 1 ? '刚刚更新' : `${cacheMinutes}分钟前`;
+        
+        const html = data.results.map((mirror, index) => {
             const domain = new URL(mirror.url).hostname;
             const isOnline = mirror.status === 'online';
             
@@ -473,20 +528,39 @@
                         <div class="libgen-mirror-url">
                             ${domain}
                             ${mirror.trusted ? '<span class="libgen-mirror-badge">可信</span>' : ''}
+                            ${index === 0 && isOnline ? '<span class="libgen-mirror-badge" style="background: #27ae60;">最佳</span>' : ''}
                         </div>
                         <div class="libgen-mirror-stats">
                             ${isOnline ? `${mirror.delay}ms` : '离线'} • 
                             ${new Date(mirror.lastChecked).toLocaleTimeString()}
                         </div>
                     </div>
-                    <a href="${mirror.url}" target="_blank" style="color: ${isOnline ? '#27ae60' : '#e74c3c'}; text-decoration: none;">
-                        ${isOnline ? '🟢' : '🔴'}
-                    </a>
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <a href="${mirror.url}" target="_blank" 
+                           style="color: ${isOnline ? '#27ae60' : '#e74c3c'}; text-decoration: none; font-size: 16px;"
+                           title="访问镜像">
+                            ${isOnline ? '🟢' : '🔴'}
+                        </a>
+                        <button onclick="window.libgenRemoveMirror('${mirror.url}')" 
+                                style="background: #e74c3c; color: white; border: none; border-radius: 3px; 
+                                       padding: 2px 6px; font-size: 10px; cursor: pointer;"
+                                title="删除镜像">
+                            ❌
+                        </button>
+                    </div>
                 </div>
             `;
         }).join('');
         
         listElement.innerHTML = html || '<div class="libgen-loading">暂无镜像数据</div>';
+        
+        // 添加删除镜像的全局函数
+        window.libgenRemoveMirror = (url) => {
+            if (confirm(`确定要删除镜像 ${new URL(url).hostname} 吗？`)) {
+                // 这里可以实现删除逻辑
+                alert('镜像删除功能需要服务端支持，当前为演示版本');
+            }
+        };
     }
     
     // 工具提示
@@ -494,19 +568,57 @@
         hideTooltip();
         tooltip = document.createElement('div');
         tooltip.className = 'libgen-tooltip';
-        tooltip.textContent = text;
+        
+        // 处理多行文本
+        tooltip.innerHTML = text.replace(/\\n/g, '<br>');
+        tooltip.style.whiteSpace = 'pre-line';
+        tooltip.style.lineHeight = '1.4';
         
         document.body.appendChild(tooltip);
         
         const rect = element.getBoundingClientRect();
-        tooltip.style.left = (rect.left - tooltip.offsetWidth - 10) + 'px';
-        tooltip.style.top = (rect.top + (rect.height - tooltip.offsetHeight) / 2) + 'px';
+        const tooltipRect = tooltip.getBoundingClientRect();
+        
+        // 智能定位，避免超出屏幕
+        let left = rect.left - tooltipRect.width - 10;
+        let top = rect.top + (rect.height - tooltipRect.height) / 2;
+        
+        // 如果左侧空间不够，显示在右侧
+        if (left < 10) {
+            left = rect.right + 10;
+        }
+        
+        // 如果上下超出屏幕，调整位置
+        if (top < 10) {
+            top = 10;
+        } else if (top + tooltipRect.height > window.innerHeight - 10) {
+            top = window.innerHeight - tooltipRect.height - 10;
+        }
+        
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
     }
     
     function hideTooltip() {
         if (tooltip) {
             tooltip.remove();
             tooltip = null;
+        }
+    }
+    
+    // 添加新镜像
+    function addNewMirror() {
+        const url = prompt('请输入新的 Libgen 镜像 URL\\n例如: https://libgen.example.com/');
+        if (!url || !url.trim()) return;
+        
+        try {
+            // 验证URL格式
+            new URL(url.trim());
+            
+            // 这里可以实现添加逻辑
+            alert(`镜像添加功能需要服务端支持\\n\\n您输入的URL: ${url.trim()}\\n\\n当前为演示版本，实际部署时可连接后端API实现此功能。`);
+        } catch (error) {
+            alert('请输入有效的URL格式');
         }
     }
     
