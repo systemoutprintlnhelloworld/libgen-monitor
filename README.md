@@ -1,7 +1,8 @@
 # 🚀 Libgen 镜像监控系统
 
 一个完整的 Libgen 镜像监控和优化下载体验的解决方案，包括服务端 API、Web 监控面板和 Tampermonkey 脚本。
-![Uploading libgen-comp.gif…]()
+![libgen-comp](https://github.com/user-attachments/assets/c35050c0-65c6-44dd-b992-4e81be334f1f)
+
 
 ## 📁 项目结构
 
