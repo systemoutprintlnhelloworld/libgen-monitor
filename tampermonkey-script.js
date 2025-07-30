@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Libgen 镜像助手 v4.0.3 - API版（缓存优化）
+// @name         Anna's Archive Libgen 下载镜像助手 v4.0.3 - API版（缓存优化）
 // @namespace    https://annas-archive.org/
 // @version      4.0.3
 // @description  先用上次测速结果立即渲染优先下载按钮，再异步测速 2‑3 s 后刷新最佳镜像。
